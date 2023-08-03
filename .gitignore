@@ -1,0 +1,28 @@
+# jobs
+*.err
+*.out
+*.sbatch
+*.slurm
+*.lsf
+
+# data
+data/
+*.gz
+*.fastq
+*.bam
+*.mtx
+*.tsv
+*.txt
+*.csv
+*.tar
+*.zip
+*.html
+*.bam
+*.rds
+
+# plots
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
