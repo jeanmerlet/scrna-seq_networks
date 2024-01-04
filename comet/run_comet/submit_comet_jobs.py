@@ -3,6 +3,7 @@ import os, re
 import pandas as pd
 import numpy as np
 
+
 data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
 jobs_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/run_comet/jobs'
 
@@ -15,7 +16,7 @@ pct = 0.02
 
 # write a jobscript to file
 # this is formatted for frontier
-def submit_job(tped_path, out_dir, celltype, num_vectors, num_fields, histogram, threshold, ccc=False):
+def submit_job(tped_path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_fields, histogram, threshold, ccc=False):
     if ccc:
         ccc_txt = ''
     else:
@@ -25,13 +26,13 @@ def submit_job(tped_path, out_dir, celltype, num_vectors, num_fields, histogram,
         '\n'
         '#SBATCH -A syb111\n'
         '#SBATCH -J comet\n'
-        f'#SBATCH -o logs/{celltype}_comet.%j.out\n'
-        f'#SBATCH -e logs/{celltype}_comet.%j.err\n'
-        '#SBATCH -t 00:30:00\n'
+        f'#SBATCH -o jobs/{tissue}/logs/{celltype}_comet.%j.out\n'
+        f'#SBATCH -e jobs/{tissue}/logs/{celltype}_comet.%j.err\n'
+        '#SBATCH -t 00:15:00\n'
         '#SBATCH -N 1\n'
         '#SBATCH -p batch\n'
         '\n'
-        'executable="/ccs/proj/syb111/sw/frontier/comet/src/install_single_release_frontier/bin/genomics_metric"\n'
+        'executable="/lustre/orion/syb111/proj-shared/Personal/jmerlet/tools/comet/install_single_release_frontier/bin/genomics_metric"\n'
         'launch_command="env OMP_PROC_BIND=spread OMP_PLACES=sockets OMP_NUM_THREADS=7'
         ' srun -N1 -n8 --cpus-per-task=7 --ntasks-per-node=8 --gpus-per-task=1 --gpu-bind=closest -u"\n'
         '\n'
@@ -46,6 +47,11 @@ def submit_job(tped_path, out_dir, celltype, num_vectors, num_fields, histogram,
     )
     if histogram:
         out_str = '--histograms_file $comet_output_dir/hist.tsv'
+        out_str += ' --threshold 4'
+        jobs_dir = os.path.join(jobs_dir, tissue)
+        logs_dir = os.path.join(jobs_dir, 'logs')
+        os.makedirs(jobs_dir, exist_ok=True)
+        os.makedirs(logs_dir, exist_ok=True)
         job_path = os.path.join(jobs_dir, celltype + '_hist.sbatch')
     else:
         if ccc:
@@ -60,6 +66,7 @@ def submit_job(tped_path, out_dir, celltype, num_vectors, num_fields, histogram,
         else:
             job_path = os.path.join(jobs_dir, celltype + '.sbatch')
     jobscript = ' '.join((jobscript, out_str))
+    jobscript = '\n\n'.join((jobscript, f'echo "finished {celltype} in {tissue}"'))
     with open(job_path, 'w') as job_file:
         job_file.write(jobscript)
     subprocess.run(['sbatch', job_path])
@@ -92,15 +99,20 @@ def get_cutoff(hist_path, pct):
     return cutoff
 
 
+def comet_already_run(out_dir):
+    for f in os.listdir(out_dir):
+        if '.bin' in f:
+            return True
+    return False
+
+
 # get a list of absolute tped paths
 input_paths = []
 for r, d, f in os.walk(data_dir):
     for tped in f:
         if '-mtx.bin' in tped:
-            if not 'immune-dc-macrophage' in tped: continue
-            #if not 'adipocyte' in tped: continue
-            #if not 'endothelial-cell-cardiac-microvascular' in tped: continue
-            input_paths.append(os.path.join(r, tped))
+            if not 'heart' in r:
+                input_paths.append(os.path.join(r, tped))
 
 input_paths.sort()
 
@@ -109,10 +121,13 @@ input_paths.sort()
 for i, path in enumerate(input_paths):
     prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
     celltype = re.search('tped/(.*)/', path).groups()[0]
+    if celltype == 'schwann-cell-i': continue
+    tissue = re.search('human/(.*)/healthy', path).groups()[0]
     root_out_dir = os.path.join(prefix, 'comet_out')
     out_dir = os.path.join(root_out_dir, celltype)
     os.makedirs(root_out_dir, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
     num_vectors, num_fields = count_dims(path)
-    submit_job(path, out_dir, celltype, num_vectors, num_fields, histogram, threshold, ccc=True)
-    print(f'submitted {celltype}', flush=True)
+    if not comet_already_run(out_dir):
+        submit_job(path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_fields, histogram, threshold, ccc=True)
+        print(f'submitted {celltype} in {tissue}', flush=True)

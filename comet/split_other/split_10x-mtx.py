@@ -1,6 +1,7 @@
+from mpi4py import MPI
 import pandas as pd
 import numpy as np
-import os
+import os, re
  
 
 meta_path = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/liver/healthy/vcir/meta/annot_humanAll.csv'
@@ -15,7 +16,8 @@ mtx_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/liver/
 mtx_path = os.path.join(mtx_dir, 'matrix.mtx')
 
 genes_path = os.path.join(mtx_dir, 'features.tsv')
-genes = pd.read_csv(genes_path, header=None, index_col=None)
+genes = pd.read_csv(genes_path, header=None, index_col=None, dtype=str)
+genes = np.squeeze(genes.values)
 num_genes = len(genes)
 
 barcodes_path = os.path.join(mtx_dir, 'barcodes.tsv')
@@ -31,7 +33,7 @@ for celltype in uniq_celltypes:
     celltype_bc_sets[celltype] = set()
 
 
-with open(mtx_path) as mtx:
+with open(mtx_path, 'r') as mtx:
     # lines have the format 'gene_idx cell_idx num_umis'
     for i, line in enumerate(mtx):
         if i < 2: continue
@@ -42,21 +44,26 @@ with open(mtx_path) as mtx:
             celltype_bc_sets[celltype].add(bc)
 
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
 for i, celltype in enumerate(uniq_celltypes):
-    print(celltype, flush=True)
+    if i != rank: continue
+    celltype_name = celltype.replace(' ', '_').replace('/', '-')
+    print(f'{celltype_name} started...', flush=True)
     data = np.zeros((num_genes, len(celltype_bc_sets[celltype])), dtype=int)
-    columns = [''] * celltype_bc_sets[celltype]
+    columns = list(celltype_bc_sets[celltype])
     comet_mtx = pd.DataFrame(data, index=genes, columns=columns)
-    colnames = np.full(len(celltype_bc_sets[celltype]), '', dtype=object)
-    with open(mtx_path) as mtx:
+    with open(mtx_path, 'r') as mtx:
         # lines have the format 'gene_idx cell_idx num_umis'
         for i, line in enumerate(mtx):
             if i < 2: continue
             gene_idx, cell_idx, num_umis = line.strip().split(' ')
-            bc = barcodes[int(cell_idx)]
-            if bc in celltypes.index and celltypes.loc[bc] == celltype:
-                comet_mtx.iloc[int(gene_idx) - 1, int(cell_idx) - 1] = num_umis
-                colnames[int(cell_idx) - 1] = bc
-    comet_mtx.columns = colnames
-    comet_mtx_out_path = os.path.join(mtx_out_dir, f'liver_{celltype}_comet-mtx.tsv')
+            bc = barcodes[int(cell_idx) - 1]
+            if bc in comet_mtx.columns:
+                col_idx = comet_mtx.columns.get_loc(bc)
+                comet_mtx.iloc[int(gene_idx) - 1, col_idx] = num_umis
+    comet_mtx_out_path = os.path.join(mtx_out_dir, f'liver_{celltype_name}_comet-mtx.tsv')
     comet_mtx.to_csv(comet_mtx_out_path, sep='\t')
+    print(f'{celltype_name} done', flush=True)
