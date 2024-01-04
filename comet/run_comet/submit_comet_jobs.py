@@ -9,9 +9,9 @@ jobs_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/run_c
 
 
 # settings
-histogram = False
+histogram = True
 threshold = True
-pct = 0.02
+pct = 0.20
 
 
 # write a jobscript to file
@@ -28,7 +28,7 @@ def submit_job(tped_path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_
         '#SBATCH -J comet\n'
         f'#SBATCH -o jobs/{tissue}/logs/{celltype}_comet.%j.out\n'
         f'#SBATCH -e jobs/{tissue}/logs/{celltype}_comet.%j.err\n'
-        '#SBATCH -t 00:15:00\n'
+        '#SBATCH -t 00:30:00\n'
         '#SBATCH -N 1\n'
         '#SBATCH -p batch\n'
         '\n'
@@ -40,18 +40,17 @@ def submit_job(tped_path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_
         f'comet_output_dir="{out_dir}"\n'
         '\n'
         f'$launch_command $executable --num_way 2 --metric_type duo --sparse yes --num_vector {num_vectors} \\\n'
-        f'    --num_field {num_fields} --all2all yes --compute_method GPU --num_proc_vector 3 --num_proc_field 1 \\\n'
+        f'    --num_field {num_fields} --all2all yes --compute_method GPU --num_proc_vector 8 --num_proc_field 1 \\\n'
         f'    --num_proc_repl 1 --tc 1 {ccc_txt}--num_tc_steps 1 --num_phase 1 --num_stage 1 --verbosity 1 \\\n'
-        '    --checksum no --phase_min 0 --phase_max 0 --stage_min 0 --stage_max 0 --metrics_shrink 1 \\\n'
+        '    --checksum no --phase_min 0 --phase_max 0 --stage_min 0 --stage_max 0 --metrics_shrink 5 \\\n'
         '    --input_file $tped_path'
     )
+    jobs_dir = os.path.join(jobs_dir, tissue)
+    logs_dir = os.path.join(jobs_dir, 'logs')
+    os.makedirs(logs_dir, exist_ok=True)
     if histogram:
         out_str = '--histograms_file $comet_output_dir/hist.tsv'
         out_str += ' --threshold 4'
-        jobs_dir = os.path.join(jobs_dir, tissue)
-        logs_dir = os.path.join(jobs_dir, 'logs')
-        os.makedirs(jobs_dir, exist_ok=True)
-        os.makedirs(logs_dir, exist_ok=True)
         job_path = os.path.join(jobs_dir, celltype + '_hist.sbatch')
     else:
         if ccc:
@@ -111,17 +110,19 @@ input_paths = []
 for r, d, f in os.walk(data_dir):
     for tped in f:
         if '-mtx.bin' in tped:
-            if not 'heart' in r:
-                input_paths.append(os.path.join(r, tped))
+            input_paths.append(os.path.join(r, tped))
 
 input_paths.sort()
 
 
 # write and submit jobs by celltype
+start_i = 100
+end_i = 200
 for i, path in enumerate(input_paths):
+    if i < start_i: continue
+    if i == end_i: break
     prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
     celltype = re.search('tped/(.*)/', path).groups()[0]
-    if celltype == 'schwann-cell-i': continue
     tissue = re.search('human/(.*)/healthy', path).groups()[0]
     root_out_dir = os.path.join(prefix, 'comet_out')
     out_dir = os.path.join(root_out_dir, celltype)

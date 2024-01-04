@@ -6,7 +6,10 @@ import argparse
 import re, os
 
 
-data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
 
 
 def make_thresholds(count_mtx):
@@ -26,29 +29,21 @@ def make_thresholds(count_mtx):
 def make_celltype_tped(in_file):
     # construct the output file's path
     file_dir, file_name = os.path.split(in_file)
+    dir_up, _ = os.path.split(file_dir)
+    tped_dir = os.path.join(dir_up, 'tped')
+    celltype = '_'.join(file_name.split('_')[:-1])
+    celltype_dir = os.path.join(tped_dir, celltype)
     out_file_name = re.sub(r'tsv$', 'tped', file_name)
-    if 'brain' in file_dir:
-        celltype = file_name.split("_")[2]
-    else:
-        celltype = file_name.split("_")[1]
-    out_tped_dir = re.sub(r'comet_mtx', 'tped', file_dir)
-    out_file_dir = os.path.join(out_tped_dir, celltype)
-    out_path = os.path.join(out_file_dir, '0.000000001_var_' + out_file_name)
+    out_path = os.path.join(celltype_dir, '0.000000001_var_' + out_file_name)
     # create output directories if they don't already exist
-    try:
-        os.mkdir(out_tped_dir)
-    except OSError:
-        pass
-    try:
-        os.mkdir(out_file_dir)
-    except OSError:
-        pass
+    os.makedirs(tped_dir, exist_ok=True)
+    os.makedirs(celltype_dir, exist_ok=True)
     # delete the out filepath if it already exists
     if os.path.exists(out_path):
         os.remove(out_path)
 
     # load in .tsv of one celltype's gene expression values
-    gene_by_cell = pd.read_csv(in_file, delimiter='\t', header=0)
+    gene_by_cell = pd.read_csv(in_file, delimiter='\t', header=0, index_col=0)
 
     # remove low gene variance rows
     gene_by_cell = gene_by_cell[ gene_by_cell.var(axis=1) > 0.000000001 ]
@@ -75,12 +70,23 @@ def make_celltype_tped(in_file):
             f.writelines(str(line))
 
 
+def check_tped_created(path):
+    file_dir, file_name = os.path.split(path)
+    dir_up, _ = os.path.split(file_dir)
+    celltype = '_'.join(file_name.split('_')[:-1])
+    tped_dir = os.path.join(dir_up, 'tped', celltype)
+    out_file_name = re.sub(r'tsv$', 'tped', file_name)
+    out_path = os.path.join(tped_dir, '0.000000001_var_' + out_file_name)
+    if os.path.isfile(out_path):
+        return True
+    return False
+
+
 in_file_list = []
-for r, d, f in os.walk(data_dir):
+for r, d, f in os.walk(args.data_dir):
     for comet_mtx in f:
         if 'comet-mtx.tsv' in comet_mtx:
-            if 'heart' not in comet_mtx:
-                in_file_list.append(os.path.join(r, comet_mtx))
+            in_file_list.append(os.path.join(r, comet_mtx))
 in_file_list.sort()
 
 
@@ -88,10 +94,25 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-for i, in_file_path in enumerate(in_file_list):
-    # distribute filepaths to ranks
-    # this assumes the number of files equals the number of ranks
-    if i != rank: continue
-    head, file_name = os.path.split(in_file_path)
-    print(f'making tped from {file_name} ({rank}/{size})', flush=True)
-    make_celltype_tped(in_file_path)
+
+if args.run:
+    new_file_list = []
+    for f in in_file_list:
+        if not check_tped_created(f):
+            new_file_list.append(f)
+    in_file_list = new_file_list
+    for i, in_file_path in enumerate(in_file_list):
+        # distribute filepaths to ranks
+        # this assumes the number of files equals the number of ranks
+        if i != rank: continue
+        head, file_name = os.path.split(in_file_path)
+        print(f'making tped from {file_name} ({rank}/{size})', flush=True)
+        make_celltype_tped(in_file_path)
+        print(f'Finished making tped from {file_name} ({rank}/{size})', flush=True)
+else:
+    print(f'total comet mtxs: {len(in_file_list)}')
+    count = 0
+    for path in in_file_list:
+        if not check_tped_created(path):
+            count += 1
+    print(f'total tpeds to create: {count}')
