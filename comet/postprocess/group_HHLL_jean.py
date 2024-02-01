@@ -1,65 +1,63 @@
 from mpi4py import MPI
-import os, re
+import argparse
+import os
 
 
-data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
 
-for r, d, f in os.walk(data_dir):
-    for comet_outfile in f:
-        if 
 
-#out1, out2 = 'T', 'T'
-out_type = 'HH+LL'
-
-HHLL_vals, HHLL_counts,original_weights = {},{},{}
-
-data_paths = [os.path.join(data_dir, path) for path in os.listdir(data_dir) if '.txt' in path]
+data_paths = []
+for r, d, f in os.walk(args.data_dir):
+    for txt in f:
+        if 'comet_out' in r and '.txt' in txt:
+            if 'archive' not in r:
+                data_paths.append(os.path.join(r, txt))
 data_paths.sort()
 
 
+def store_edgeweight(name, HH_vals, LL_vals, duo0, duo1, edgeweight):
+    if duo0 == '1' and duo1 == '1':
+        HH_vals[name] = edgeweight
+    elif duo0 == '0' and duo1 == '0':
+        LL_vals[name] = edgeweight
 
-
-def check_correct_duo_type(duo0,duo1):
-    return((duo0 == 0 and duo1 == 0) or (duo0 == 1 and duo1 == 1))
+def combine_edgeweights(name, HH_vals, LL_vals, HHLL_vals):
+    if name in HH_vals and name in LL_vals:
+        combined_edgeweight = HH_vals[name] + LL_vals[name]
+        HHLL_vals[name] = combined_edgeweight
 
 def convert_to_edge_list_tsv(in_path):
-    _, file_name = os.path.split(path)
-    out_path = os.path.join(out_dir, out_type + '_' + file_name[:-4] + '.tsv')
+    HH_vals, LL_vals, HHLL_vals = {}, {}, {}
+    out_dir, file_name = os.path.split(path)
+    out_path = os.path.join(out_dir, 'HHLL_' + file_name[:-4] + '.tsv')
+    with open(in_path, 'rt') as in_file:
+        for line in in_file:
+            _, duo0, _, duo1, id0, id1, edgeweight = line.strip().split(' ')
+            edgeweight = float(edgeweight)
+            if duo0 == duo1:
+                name = [id0[:-2], id1[:-2]]
+                name.sort()
+                name = tuple(name)
+                store_edgeweight(name, HH_vals, LL_vals, duo0, duo1, edgeweight)
+                combine_edgeweights(name, HH_vals, LL_vals, HHLL_vals)
+    maxweight = max(HHLL_vals.values())
     with open(out_path, 'wt') as out_file:
-        with open(in_path, 'rt') as in_file:
-            for line in in_file:
-                _, duo0, _, duo1, id0, id1, edge_weight = line.strip('\n').split(' ')
-                duo0, duo1, edge_weight = int(duo0), int(duo1), float(edge_weight)
-                if check_correct_duo_type(duo0,duo1):
-
-                    name = [id0[:-2], id1[:-2]]
-                    name.sort()
-                    name = tuple(name)
-                    if duo0 == 0 and duo1==0:
-                        LL_vals[name] = edge_weight
-                    if duo0 == 1 and duo1 ==1:
-                        HH_vales[name] = edge_weight
-
-                    if name not in HHLL_vals:
-                        HHLL_vals[name] = edge_weight
-                        HHLL_counts[name] = 1
-                    elif HHLL_counts[name] == 1:
-                        HHLL_vals[name] += edge_weight 
-                        HHLL_counts[name] += 1
-                    else:
-                        print(name)
-                        break
-            
-            for i, key in enumerate(HHLL_vals):
-                print(key[0]+' '+key[1]+ '\n'+'HH: '+ HH_vals[key] + ' LL: '+LL_vals[key]+' HHLL: '+HHLL_vals[key]
-                out_file.write('\t'.join((key[0], key[1], str(round(HHLL_vals[key],6)))) + '\n')
+        for name, edgeweight in HHLL_vals.items():
+            normweight = str(round(edgeweight / maxweight, 6))
+            out_file.write('\t'.join([name[0], name[1], normweight]) + '\n')
                     
-                    
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
 
-for i, path in enumerate(data_paths):
-    # distribute across ranks
-    if i % size != rank: continue
-    convert_to_edge_list_tsv(path)
+if not args.run:
+    print(f'txt files to convert to combined tsv: {len(data_paths)}')
+else:                    
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    for i, path in enumerate(data_paths):
+        # match to ranks
+        if i != rank: continue
+        convert_to_edge_list_tsv(path)
+        print(f'finished {path}')

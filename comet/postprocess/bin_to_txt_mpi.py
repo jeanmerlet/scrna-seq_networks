@@ -5,10 +5,9 @@ import re, os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--data_dir')
-parser.add_argument('-t', '--tped_dir')
 parser.add_argument('-c', '--comet_tools_dir')
 parser.add_argument('-w', '--num_way')
-parser.add_argument('-r', '--run')
+parser.add_argument('-r', '--run', action='store_true')
 args = parser.parse_args()
 
 
@@ -37,11 +36,17 @@ comet_out_paths = []
 for r, d, f in os.walk(args.data_dir):
     for out_file in f:
         if re.match('^out.*bin$', out_file):
-            comet_out_paths.append(os.path.join(r, out_file))
+            if 'archive' not in r:
+                comet_out_paths.append(os.path.join(r, out_file))
 comet_out_paths.sort()
 
 
 if args.run:
+    paths = []
+    for path in comet_out_paths:
+        if not file_is_postprocessed(path):
+            paths.append(path)
+    comet_out_paths = paths
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -52,7 +57,7 @@ if args.run:
         head, file_name = os.path.split(path)
         print(f'postprocessing {file_name} ({rank}/{size})', flush=True)
         _, celltype = os.path.split(head)
-        tped_prefix = os.path.join(args.tped_dir, celltype, 'heart_' + celltype + '_comet-mtx')
+        tped_prefix = os.path.join(re.sub('comet_out', 'tped', head), '0.0000000001_var_' + celltype + '_comet-mtx')
         comet_postprocess(path, args.comet_tools_dir, tped_prefix, args.num_way)
         print(f'finished {file_name} ({rank}/{size})', flush=True)
 else:
@@ -60,7 +65,8 @@ else:
     count = 0
     for path in comet_out_paths:
         if not file_is_postprocessed(path):
-            count += 1
-        else:
             print(path)
+            count += 1
+        #else:
+        #    print(path)
     print(f'total files to postprocess: {count}')

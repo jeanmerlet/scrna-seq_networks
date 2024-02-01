@@ -9,7 +9,7 @@ jobs_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/run_c
 
 
 # settings
-histogram = True
+histogram = False
 threshold = True
 pct = 0.20
 
@@ -109,15 +109,15 @@ def comet_already_run(out_dir):
 input_paths = []
 for r, d, f in os.walk(data_dir):
     for tped in f:
-        if '-mtx.bin' in tped:
-            input_paths.append(os.path.join(r, tped))
+        if 'old' not in r:
+            if '-mtx.bin' in tped:
+                input_paths.append(os.path.join(r, tped))
 
 input_paths.sort()
 
-
 # write and submit jobs by celltype
-start_i = 100
-end_i = 200
+start_i = 200
+end_i = 300
 for i, path in enumerate(input_paths):
     if i < start_i: continue
     if i == end_i: break

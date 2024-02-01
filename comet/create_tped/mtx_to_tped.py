@@ -34,7 +34,7 @@ def make_celltype_tped(in_file):
     celltype = '_'.join(file_name.split('_')[:-1])
     celltype_dir = os.path.join(tped_dir, celltype)
     out_file_name = re.sub(r'tsv$', 'tped', file_name)
-    out_path = os.path.join(celltype_dir, '0.000000001_var_' + out_file_name)
+    out_path = os.path.join(celltype_dir, '0.0000000001_var_' + out_file_name)
     # create output directories if they don't already exist
     os.makedirs(tped_dir, exist_ok=True)
     os.makedirs(celltype_dir, exist_ok=True)
@@ -46,7 +46,7 @@ def make_celltype_tped(in_file):
     gene_by_cell = pd.read_csv(in_file, delimiter='\t', header=0, index_col=0)
 
     # remove low gene variance rows
-    gene_by_cell = gene_by_cell[ gene_by_cell.var(axis=1) > 0.000000001 ]
+    gene_by_cell = gene_by_cell[ gene_by_cell.var(axis=1) > 0.0000000001 ]
     
     # grab the gene names to make labels later
     gene_IDs = gene_by_cell.index.tolist()
@@ -77,6 +77,7 @@ def check_tped_created(path):
     tped_dir = os.path.join(dir_up, 'tped', celltype)
     out_file_name = re.sub(r'tsv$', 'tped', file_name)
     out_path = os.path.join(tped_dir, '0.000000001_var_' + out_file_name)
+    #out_path = os.path.join(tped_dir, out_file_name)
     if os.path.isfile(out_path):
         return True
     return False
@@ -86,7 +87,9 @@ in_file_list = []
 for r, d, f in os.walk(args.data_dir):
     for comet_mtx in f:
         if 'comet-mtx.tsv' in comet_mtx:
-            in_file_list.append(os.path.join(r, comet_mtx))
+            if 'comet_mtx_old' not in r:
+                if 'liver' not in r:
+                    in_file_list.append(os.path.join(r, comet_mtx))
 in_file_list.sort()
 
 

@@ -37,7 +37,8 @@ tped_paths = []
 for r, d, f in os.walk(data_dir):
     for tped in f:
         if '.tped' in tped:
-            tped_paths.append(os.path.join(r, tped))
+            if 'old' not in r:
+                tped_paths.append(os.path.join(r, tped))
 
 tped_paths.sort()
 
