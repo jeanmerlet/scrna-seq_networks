@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import argparse
 import os
 
@@ -43,16 +42,15 @@ def convert_to_edge_list_tsv(in_path):
                 name = tuple(name)
                 store_edgeweight(name, HH_vals, LL_vals, duo0, duo1, edgeweight)
                 combine_edgeweights(name, HH_vals, LL_vals, HHLL_vals)
-    maxweight = max(HHLL_vals.values())
     with open(out_path, 'wt') as out_file:
         for name, edgeweight in HHLL_vals.items():
-            normweight = str(round(edgeweight / maxweight, 6))
-            out_file.write('\t'.join([name[0], name[1], normweight]) + '\n')
+            out_file.write('\t'.join([name[0], name[1], str(round(edgeweight, 6))]) + '\n')
                     
 
 if not args.run:
     print(f'txt files to convert to combined tsv: {len(data_paths)}')
 else:                    
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()

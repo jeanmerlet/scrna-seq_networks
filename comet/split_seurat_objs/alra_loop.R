@@ -134,17 +134,17 @@ alra <- function(mat, k=0, q=10, quantile.prob=0.001, use.mkl=F, mkl.seed=-1) {
     mat_rank_k_cor_sc <- mat_rank_k_cor
 
     cat(sprintf('Scaling all except for %d columns (genes)\n', sum(!toscale)))
-idx <- 0
-for (value in toscale) {
-    idx <- idx + 1
-    if (idx %% 1000 == 0) { print(idx) }
-    if (!value) { next }
-    gene_vector <- mat_rank_k_cor[,idx] * sigma_1_2[idx]
-    gene_vector <- gene_vector + toadd[idx]
-    gene_vector[mat_rank_k_cor[,idx] == 0] = 0
-    mat_rank_k_cor_sc[,idx] <- gene_vector
-}
-mat_rank_k_cor_sc[mat_rank_k_cor==0] = 0
+    idx <- 0
+    for (value in toscale) {
+        idx <- idx + 1
+        if (idx %% 1000 == 0) { print(idx) }
+        if (!value) { next }
+        gene_vector <- mat_rank_k_cor[,idx] * sigma_1_2[idx]
+        gene_vector <- gene_vector + toadd[idx]
+        gene_vector[mat_rank_k_cor[,idx] == 0] = 0
+        mat_rank_k_cor_sc[,idx] <- gene_vector
+    }
+    mat_rank_k_cor_sc[mat_rank_k_cor==0] = 0
 
     #mat_rank_k_temp <- mat_rank_k_cor[,toscale]
     #mat_rank_k_temp <- sweep(mat_rank_k_temp,2, sigma_1_2[toscale],FUN = '*')

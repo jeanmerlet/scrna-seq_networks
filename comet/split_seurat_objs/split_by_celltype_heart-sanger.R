@@ -106,7 +106,10 @@ scale_genes <- function(mat, mat_rank_k, quantile.prob) {
     mat_rank_k_cor_sc[mat_rank_k_cor==0] = 0
     lt0 <- mat_rank_k_cor_sc < 0
     mat_rank_k_cor_sc[lt0] <- 0
-    cat(sprintf('%.2f%% of the values became negative in the scaling process and were set to zero\n', 100*sum(lt0)/(nrow(mat)*ncol(mat))))
+    num_lt0 <- as.numeric(sum(lt0))
+    num_rows <- as.numeric(nrow(mat))
+    num_cols <- as.numeric(ncol(mat))
+    cat(sprintf('%.2f%% of the values became negative in the scaling process and were set to zero\n', 100*num_lt0/(num_rows*num_cols)))
     return(mat_rank_k_cor_sc)
 }
 
@@ -116,20 +119,20 @@ run_alra <- function(obj, k, method, q, quantile.prob) {
     mat_rank_k <- randomized.svd(mat, k, method, q)
     mat_rank_k_cor_sc <- scale_genes(mat, mat_rank_k, quantile.prob)
     remove(mat_rank_k)
+    print('removed mat_rank_k')
     # set originally nonzero values that are now 0 from thresholding
     # back to their pre-imputation nonzero values
     originally_nonzero <- mat > 0
     mat_rank_k_cor_sc[originally_nonzero & mat_rank_k_cor_sc == 0] <- mat[originally_nonzero & mat_rank_k_cor_sc == 0]
     colnames(mat_rank_k_cor_sc) <- colnames(mat)
-    #original_nz <- sum(mat > 0)/(nrow(mat)*ncol(mat))
-    #completed_nz <- sum(mat_rank_k_cor_sc > 0)/(nrow(mat)*ncol(mat))
-    #cat(sprintf('The matrix went from %.2f%% nonzero to %.2f%% nonzero\n', 100*original_nz, 100*completed_nz))
+    original_nz <- as.numeric(sum(mat > 0))/(as.numeric(nrow(mat))*as.numeric(ncol(mat)))
+    completed_nz <- as.numeric(sum(mat_rank_k_cor_sc > 0))/(as.numeric(nrow(mat))*as.numeric(ncol(mat)))
+    cat(sprintf('The matrix went from %.2f%% nonzero to %.2f%% nonzero\n', 100*original_nz, 100*completed_nz))
     remove(mat)
     mat_rank_k_cor_sc <- t(mat_rank_k_cor_sc)
     colnames(mat_rank_k_cor_sc) <- rownames(obj@meta.data)
-    #print('saving imputed matrix to tsv')
+    print('saving imputed matrix to tsv')
     write.table(mat_rank_k_cor_sc, file=out_path, sep='\t', row.names=TRUE, col.names=TRUE, quote=FALSE)
-    #saveRDS(mat_rank_k_cor_sc, out_path)
     # cannot dgcmatrix on matrices with more than ~180k cells x ~35k genes
     #mat_rank_k_cor_sc <- Matrix(mat_rank_k_cor_sc, sparse=T)
     #obj <- SetAssayData(object=obj, slot='data', new.data=mat_rank_k_cor_sc)
