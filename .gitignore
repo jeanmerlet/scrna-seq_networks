@@ -29,3 +29,6 @@ data/
 
 # pycache
 *.pyc
+
+# text editors
+*.swp
