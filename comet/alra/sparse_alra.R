@@ -69,50 +69,61 @@ scale_genes <- function(rank_k_mtx_cor, to_scale, sigma_1_2, to_add) {
 }
 
 
-impute_gene <- function(orig_col, gene_col, quantile.prob=0.001) {
-    gene_quants <- abs(quantile(gene_col, quantile.prob))
-    gene_col_zero <- replace(gene_col, gene_col <= gene_quants, 0)
-    
-    sigma_1 <- sd(gene_col_zero[which(gene_col_zero != 0)])
-    #sigma_2 <- sd(mtx[,idx][which(mtx[,idx] != 0)])
-    sigma_2 <- sd(orig_col[which(orig_col != 0)])
-    mu_1 <- mean(gene_col_zero[which(gene_col_zero > 0)])
-    #mu_2 <- mean(mtx[,idx][which(mtx[,idx] != 0)])
-    mu_2 <- mean(orig_col[which(orig_col != 0)])
+impute_geneset <- function(orig_colset, gene_colset, quantile.prob=0.001) {
+    # loop over each gene column in gene_colset
+    gene_colset_zero <- c()
+    for (i in 1:dim(gene_colset)[2]) {
+        orig_col <- orig_colset[,i]
+        gene_col <- gene_colset[,i]
+        
+        gene_quants <- abs(quantile(gene_col, quantile.prob))
+        gene_col_zero <- replace(gene_col, gene_col <= gene_quants, 0)
+        
+        sigma_1 <- sd(gene_col_zero[which(gene_col_zero != 0)])
+        #sigma_2 <- sd(mtx[,idx][which(mtx[,idx] != 0)])
+        sigma_2 <- sd(orig_col[which(orig_col != 0)])
+        mu_1 <- mean(gene_col_zero[which(gene_col_zero > 0)])
+        #mu_2 <- mean(mtx[,idx][which(mtx[,idx] != 0)])
+        mu_2 <- mean(orig_col[which(orig_col != 0)])
 
-    sigma_1_2 <- sigma_2/sigma_1
-    mu_1_2 <- -1*mu_1*sigma_2/sigma_1 + mu_2
+        sigma_1_2 <- sigma_2/sigma_1
+        mu_1_2 <- -1*mu_1*sigma_2/sigma_1 + mu_2
 
-    # determine whether or not imputation is needed for this gene
-    # and assign to boolean do_imputation
-    do_imputation <- !is.na(sigma_1) & !is.na(sigma_2) &
-                     !(sigma_1 == 0 & sigma_2 == 0) & !(sigma_1 == 0)
+        # determine whether or not imputation is needed for this gene
+        # and assign to boolean do_imputation
+        do_imputation <- !is.na(sigma_1) & !is.na(sigma_2) &
+                         !(sigma_1 == 0 & sigma_2 == 0) & !(sigma_1 == 0)
 
-    if (do_imputation) {
-        # do imputation
-        zeros <- which(gene_col_zero == 0)
-        gene_col_zero <- gene_col_zero * sigma_1_2
-        gene_col_zero <- gene_col_zero + mu_1_2
-        gene_col_zero[zeros] = 0
+        if (do_imputation) {
+            # do imputation
+            zeros <- which(gene_col_zero == 0)
+            gene_col_zero <- gene_col_zero * sigma_1_2
+            gene_col_zero <- gene_col_zero + mu_1_2
+            gene_col_zero[zeros] = 0
+        }
+        negative <- gene_col_zero < 0
+        gene_col_zero[negative] <- 0
+        
+        orig_values <- gene_col[gene_col > 0 & gene_col_zero == 0]
+        gene_col_zero[gene_col > 0 & gene_col_zero == 0] <- orig_values
+        gene_colset_zero <- c(gene_colset_zero, gene_col_zero)
     }
-    negative <- gene_col_zero < 0
-    gene_col_zero[negative] <- 0
-    
-    orig_values <- gene_col[gene_col > 0 & gene_col_zero == 0]
-    gene_col_zero[gene_col > 0 & gene_col_zero == 0] <- orig_values
-    
-    return(gene_col_zero)
+    gene_colset_zero <- cbind.spam(gene_colset_zero)
+    return(gene_colset_zero)
 }
 
 
 # main function
-alra <- function(mtx, normalize=FALSE) {
+alra <- function(mtx, normalize=FALSE, choose_k=TRUE) {
     ## need the count mtx to be cells x genes (rows x cols) ##
     # normalize
     if (normalize) { mtx <- normalize(mtx) }
     # pick k heuristically
-    k <- 50
-    #k <- choose_k(mtx)
+    if (choose_k) {
+        k <- choose_k(mtx)
+    } else {
+        k <- 50
+    }
     # randomized svd
     rsvd_out <- irlba(mtx, k)
     u <- rsvd_out$u
@@ -126,28 +137,44 @@ alra <- function(mtx, normalize=FALSE) {
     # v k x 57186
     
     # test code below
-    i <- 1
-    orig_col <- mtx[,i]
-    gene_col <- u[,1:k] %*% diag(d[1:k]) %*% as.matrix(t(v[, 1:k])[,i])
-    gene_col <- impute_gene(orig_col, gene_col)
+    #i <- 1
+    #orig_col <- mtx[,i]
+    #gene_col <- u[,1:k] %*% diag(d[1:k]) %*% as.matrix(t(v[, 1:k])[,i])
+    #gene_col <- impute_gene(orig_col, gene_col)
     # test code above
 
+    # original code to compare to
+    #test_result <- u[,1:k] %*% diag(d[1:k]) %*% t(v[,1:k])
+
     # doparallel attempt
-    num_cores <- detectCores(logical=FALSE) - 1
-    registerDoParallel(num_cores)
-    num_genes <- dim(mtx)[2]
+
+    # linear algrebra
     u_mtx <- u[,1:k]
     d_mtx <- diag(d[1:k])
     ud_mtx <- u_mtx %*% d_mtx
     v_mtx <- t(v[,1:k])
-    num_genes <- 100
-    pb <- txtProgressBar(0, num_genes, style = 2)
-    gene_mtx <- invisible(foreach(i=(1:num_genes), .packages=c('spam', 'spam64', 'irlba'), .combine=cbind.spam) %dopar% {
-        orig_col <- mtx[,i]
-        gene_col <- as.spam(ud_mtx %*% as.matrix(v_mtx[,i]))
-        setTxtProgressBar(pb, i)
+
+    num_cores <- detectCores(logical=FALSE) - 1
+    cluster <- makeCluster(num_cores)
+    registerDoParallel(cluster)
+    num_genes <- dim(mtx)[2]
+    chunk_size <- num_genes %/% (num_cores - 1)
+    all_indices <- 1:num_genes
+    idx_sets <- split(all_indices, ceiling(seq_along(all_indices)/chunk_size))
+
+    print('starting per gene-col imputation')
+    start <- Sys.time()
+    imputed_mtx <- foreach(i=(1:length(idx_sets)), .export=c('impute_geneset'), .packages=c('spam', 'spam64', 'irlba'), .combine='cbind.spam') %dopar% {
+        idx_set <- idx_sets[[i]]
+        orig_colset <- mtx[,idx_set]
+        gene_colset <- as.spam(ud_mtx %*% as.matrix(v_mtx[,idx_set]))
+        gene_colset <- impute_geneset(orig_colset, gene_colset)
         #gene_col <- impute_gene(orig_col, gene_col)
-    })
-    stopCluster(num_cores)
-    return(gene_mtx)
+        return(gene_colset)
+    }
+    print(Sys.time() - start)
+    stopCluster(cluster)
+    return(imputed_mtx)
 }
+
+result <- alra(mtx, normalize=TRUE, choose_k=FALSE)
