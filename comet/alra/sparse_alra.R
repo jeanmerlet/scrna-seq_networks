@@ -5,13 +5,25 @@ library(irlba)
 library(doParallel)
 
 
-# 10x test matrix directory
-mtx_dir <- '/lustre/orion/syb111/proj-shared/Personal/jmerlet/projects/atopic_dermatitis/ko/data/count-matrices/SRR14253412_Solo.out/Gene/filtered'
-mtx <- Read10X(mtx_dir)
-mtx <- as.spam(as.matrix(mtx))
-# expecting cells x genes
-mtx <- t(mtx)
-# eventually remove this code ^
+seurat <- TRUE
+if (!seurat) {
+    # 10x test matrix directory
+    mtx_dir <- '/lustre/orion/syb111/proj-shared/Personal/jmerlet/projects/atopic_dermatitis/ko/data/count-matrices/SRR14253412_Solo.out/Gene/filtered'
+    mtx <- Read10X(mtx_dir)
+    #mtx <- as.spam(as.matrix(mtx))
+    mtx <- as.matrix(mtx)
+    # expecting cells x genes
+    mtx <- t(mtx)
+} else {
+    # test a large matrix
+    print('loading seurat object...')
+    obj <- readRDS('/gpfs/alpine2/syb112/proj-shared/Projects/scrna-seq/data/arabidopsis/root/healthy/ohler/seurat/root_atlas_seu4.rds')
+    print('converting seurat object...')
+    DefaultAssay(obj) <- 'RNA'
+    #mtx <- as.spam(t(as.matrix(GetAssayData(object=obj, slot='data'))))
+    mtx <- t(as.matrix(GetAssayData(object=obj, slot='data')))
+    rm(obj)
+}
 
 
 normalize <- function(mtx) {
@@ -20,6 +32,7 @@ normalize <- function(mtx) {
     mtx <- sweep(mtx, 1, total_umis_per_cell, '/')
     mtx <- mtx * 1E4
     mtx <- log(mtx + 1)
+    mtx <- as.spam(mtx)
     print('normalized!')
     return(mtx)
 }
@@ -39,51 +52,21 @@ choose_k <- function(mtx, k=100, noise_start=80, thresh=6) {
 }
 
 
-get_genes_to_scale_index <- function(mtx, rank_k_mtx, quantile.prob=0.001) {
-    # COMMENTED OUT HAS BEEN CONVERTED TO PER-GENE
-    #cat(sprintf("Find the %f quantile of each gene\n", quantile.prob))
-    #rank_k_mins <- abs(apply(rank_k_mtx, 2, FUN=function(x) quantile(x, quantile.prob)))
-    #print("Sweep")
-    #rank_k_mtx_cor <- replace(rank_k_mtx, rank_k_mtx <= rank_k_mins[col(rank_k_mtx)], 0)
-    #sd_nonzero <- function(x) sd(x[!x == 0])
-    #sigma_1 <- apply(rank_k_mtx_cor, 2, sd_nonzero)
-    #sigma_2 <- apply(mtx, 2, sd_nonzero)
-    mu_1 <- colSums(rank_k_mtx_cor)/colSums(!!rank_k_mtx_cor)
-    mu_2 <- colSums(mtx)/colSums(!!mtx)
-    to_scale <- !is.na(sigma_1) & !is.na(sigma_2) & !(sigma_1 == 0 & sigma_2 == 0) & !(sigma_1 == 0)
-    sigma_1_2 <- sigma_2/sigma_1
-    to_add  <- -1*mu_1*sigma_2/sigma_1 + mu_2
-    return(list(rank_k_mtx_cor, to_scale, sigma_1_2, to_add))
-}
-
-
-scale_genes <- function(rank_k_mtx_cor, to_scale, sigma_1_2, to_add) {
-    rank_k_mtx_tmp <- rank_k_mtx_cor[,toscale]
-    rank_k_mtx_tmp <- sweep(rank_k_mtx_tmp,2, sigma_1_2[to_scale],FUN = "*")
-    rank_k_mtx_tmp <- sweep(rank_k_mtx_tmp,2, toadd[to_scale],FUN = "+")
-    rank_k_mtx_cor_sc <- rank_k_mtx_cor
-    rank_k_mtx_cor_sc[,toscale] <- rank_k_mtx_tmp
-    rank_k_mtx_cor_sc[rank_k_mtx_cor==0] = 0
-    lt0 <- rank_k_mtx_cor_sc < 0
-    rank_k_mtx_cor_sc[lt0] <- 0
-}
-
-
 impute_geneset <- function(orig_colset, gene_colset, quantile.prob=0.001) {
     # loop over each gene column in gene_colset
     gene_colset_zero <- c()
     for (i in 1:dim(gene_colset)[2]) {
         orig_col <- orig_colset[,i]
         gene_col <- gene_colset[,i]
+        #orig_col <- as.spam(orig_colset[,i])
+        #gene_col <- as.spam(gene_colset[,i])
         
         gene_quants <- abs(quantile(gene_col, quantile.prob))
         gene_col_zero <- replace(gene_col, gene_col <= gene_quants, 0)
         
         sigma_1 <- sd(gene_col_zero[which(gene_col_zero != 0)])
-        #sigma_2 <- sd(mtx[,idx][which(mtx[,idx] != 0)])
         sigma_2 <- sd(orig_col[which(orig_col != 0)])
         mu_1 <- mean(gene_col_zero[which(gene_col_zero > 0)])
-        #mu_2 <- mean(mtx[,idx][which(mtx[,idx] != 0)])
         mu_2 <- mean(orig_col[which(orig_col != 0)])
 
         sigma_1_2 <- sigma_2/sigma_1
@@ -103,18 +86,19 @@ impute_geneset <- function(orig_colset, gene_colset, quantile.prob=0.001) {
         }
         negative <- gene_col_zero < 0
         gene_col_zero[negative] <- 0
-        
-        orig_values <- gene_col[gene_col > 0 & gene_col_zero == 0]
-        gene_col_zero[gene_col > 0 & gene_col_zero == 0] <- orig_values
-        gene_colset_zero <- c(gene_colset_zero, gene_col_zero)
+        gene_col_zero[orig_col > 0 & gene_col_zero == 0] <- gene_col[orig_col > 0 & gene_col_zero == 0]
+        gene_colset_zero <- c(gene_colset_zero, as.spam(gene_col_zero))
     }
-    gene_colset_zero <- cbind.spam(gene_colset_zero)
+    gene_colset_zero <- do.call('cbind.spam', gene_colset_zero)
     return(gene_colset_zero)
 }
 
 
 # main function
-alra <- function(mtx, normalize=FALSE, choose_k=TRUE) {
+sparse_alra <- function(mtx, normalize=FALSE, choose_k=TRUE) {
+    num_cells <- dim(mtx)[1]
+    num_genes <- dim(mtx)[2]
+    sprintf('imputing matrix with %s cells and %s genes', num_cells, num_genes)
     ## need the count mtx to be cells x genes (rows x cols) ##
     # normalize
     if (normalize) { mtx <- normalize(mtx) }
@@ -125,10 +109,16 @@ alra <- function(mtx, normalize=FALSE, choose_k=TRUE) {
         k <- 50
     }
     # randomized svd
+    start <- Sys.time()
+    print('rsvd...')
     rsvd_out <- irlba(mtx, k)
-    u <- rsvd_out$u
-    d <- rsvd_out$d
-    v <- rsvd_out$v
+    #u <- rsvd_out$u
+    #d <- rsvd_out$d
+    #v <- rsvd_out$v
+    u <- as.spam(rsvd_out$u)
+    d <- as.spam(rsvd_out$d)
+    v <- as.spam(rsvd_out$v)
+    rm(rsvd_out)
     # note: dim(u[,1:k] %*% diag(d[1:k]) %*% t(v[,1:k])) == dim(mtx)
     # note for linear algebra retards (us): matrix mult needs
     # num columns 1st matrix == num rows 2nd matrix
@@ -150,31 +140,36 @@ alra <- function(mtx, normalize=FALSE, choose_k=TRUE) {
 
     # linear algrebra
     u_mtx <- u[,1:k]
-    d_mtx <- diag(d[1:k])
+    d_mtx <- as.spam(diag(d[1:k]))
     ud_mtx <- u_mtx %*% d_mtx
     v_mtx <- t(v[,1:k])
 
+    print('rsvd done!')
+    print(Sys.time() - start)
+
     num_cores <- detectCores(logical=FALSE) - 1
+    print(num_cores)
     cluster <- makeCluster(num_cores)
+    print(cluster)
     registerDoParallel(cluster)
     num_genes <- dim(mtx)[2]
     chunk_size <- num_genes %/% (num_cores - 1)
     all_indices <- 1:num_genes
     idx_sets <- split(all_indices, ceiling(seq_along(all_indices)/chunk_size))
 
-    print('starting per gene-col imputation')
+    print('Imputing...')
     start <- Sys.time()
     imputed_mtx <- foreach(i=(1:length(idx_sets)), .export=c('impute_geneset'), .packages=c('spam', 'spam64', 'irlba'), .combine='cbind.spam') %dopar% {
         idx_set <- idx_sets[[i]]
         orig_colset <- mtx[,idx_set]
-        gene_colset <- as.spam(ud_mtx %*% as.matrix(v_mtx[,idx_set]))
+        gene_colset <- ud_mtx %*% v_mtx[,idx_set]
         gene_colset <- impute_geneset(orig_colset, gene_colset)
-        #gene_col <- impute_gene(orig_col, gene_col)
         return(gene_colset)
     }
+    print('Imputation done!')
     print(Sys.time() - start)
     stopCluster(cluster)
     return(imputed_mtx)
 }
 
-result <- alra(mtx, normalize=TRUE, choose_k=FALSE)
+sparse_result <- sparse_alra(mtx, normalize=TRUE, choose_k=FALSE)

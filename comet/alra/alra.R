@@ -120,6 +120,7 @@ alra <- function( A_norm, k=0,q=10, quantile.prob = 0.001, use.mkl = F, mkl.seed
         k <-  k_choice$k
         cat(sprintf("Chose k=%d\n",k))
     }
+    k <- 60
 
     cat("Getting nonzeros\n")
     originally_nonzero <- A_norm >0 
