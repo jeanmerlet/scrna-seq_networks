@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#SBATCH -A syb111
+#SBATCH -J comet
+#SBATCH -o jobs/heart/logs/heart_immune-nk-cell_comet.%j.out
+#SBATCH -e jobs/heart/logs/heart_immune-nk-cell_comet.%j.err
+#SBATCH -t 00:30:00
+#SBATCH -N 1
+#SBATCH -p batch
+
+executable="/lustre/orion/syb111/proj-shared/Personal/jmerlet/tools/comet/install_single_release_frontier/bin/genomics_metric"
+launch_command="env OMP_PROC_BIND=spread OMP_PLACES=sockets OMP_NUM_THREADS=7 srun -N1 -n8 --cpus-per-task=7 --ntasks-per-node=8 --gpus-per-task=1 --gpu-bind=closest -u"
+
+tped_path="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/heart/healthy/gtex/tped/heart_immune-nk-cell/0.000000001_var_heart_immune-nk-cell_comet-mtx.bin"
+comet_output_dir="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/heart/healthy/gtex/comet_out/heart_immune-nk-cell"
+
+$launch_command $executable --num_way 2 --metric_type duo --sparse yes --num_vector 21826 \
+    --num_field 6380 --all2all yes --compute_method GPU --num_proc_vector 8 --num_proc_field 1 \
+    --num_proc_repl 1 --tc 1 --num_tc_steps 1 --num_phase 1 --num_stage 1 --verbosity 1 \
+    --checksum no --phase_min 0 --phase_max 0 --stage_min 0 --stage_max 0 --metrics_shrink 5 \
+    --input_file $tped_path --histograms_file $comet_output_dir/hist.tsv --threshold 4
+
+echo "finished heart_immune-nk-cell in heart"

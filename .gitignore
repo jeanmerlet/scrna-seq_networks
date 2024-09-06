@@ -1,9 +1,6 @@
 # jobs
 *.err
 *.out
-*.sbatch
-*.slurm
-*.lsf
 
 # data
 data/

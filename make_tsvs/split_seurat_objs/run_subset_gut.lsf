@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#BSUB -P SYB112
+#BSUB -nnodes 1
+#BSUB -W 6:00
+#BSUB -J subset_gut
+#BSUB -o logs/subset_gut.%J.out
+#BSUB -e logs/subset_gut.%J.err
+#BSUB -q batch-hm
+
+source activate /gpfs/alpine2/syb112/proj-shared/Personal/jmerlet/envs/summit/py_base
+
+path="/gpfs/alpine2/syb112/proj-shared/Projects/scrna-seq/code/comet/split_seurat_objs/subset_gut.py"
+
+jsrun -n 1 -a 1 -r 1 -c 8 python $path
