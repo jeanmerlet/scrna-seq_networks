@@ -1,0 +1,13 @@
+#module load amd-mixed/5.6.0 # previously used rocm default which loaded 5.3
+#module load boost
+#module load ums/default
+# module load ums002/default
+#module load cray-mpich/8.1.23
+#module load cray-mpich/8.1.28
+
+#module load omnitrace
+
+export MPI4PY_RC_RECV_MPROBE=0
+
+source /lustre/orion/syb111/proj-shared/Environments/andes/source_miniconda_andes.sh  #/lustre/orion/syb111/world-shared/miniconda3/source_conda.sh
+source activate /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_loop_env_andes/ #/lustre/orion/syb111/proj-shared/Environments/frontier/irf_loop_python 
