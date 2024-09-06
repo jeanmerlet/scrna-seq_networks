@@ -10,22 +10,19 @@ suppressMessages({
 
 # num_nodes should be number of nodes you allocate minus 1
 #TODO: find Sys() call to detect num of nodes
-num_nodes <- 31
-num_cpus_per_node <- 16
+num_nodes <- 7
+num_cpus_per_node <- 2
 
 
-#TODO: run irlba on rank 0 and broadcast (also for choose k)
-#TODO: refactor sparse_alra, impute_geneset
 #TODO: fix normalize to work on spam matrices (just use Seurat normalize)
+#TODO: break up and modularize sparse_alra, impute_geneset
 #TODO: add comments / modify comments
-#TODO: create package skeleton
 #TODO: address this seurat 5.0 warning message: 'The `slot` argument of `GetAssayData()` is deprecated as of SeuratObject 5.0.0. Please use the `layer` argument instead.'
-#TODO: perhaps add a try catch wrapper to always call finalize()? google if this is a thing
+#TODO: create package skeleton
 
 
 check_rank_zero <- function(...) {
     if (pbdMPI::comm.rank() == 0) {
-        # execute
         for (arg in list(...)) {
             eval(arg)
         }
@@ -33,14 +30,13 @@ check_rank_zero <- function(...) {
 }
 
 
-seurat <- TRUE
+seurat <- FALSE
 if (!seurat) {
     # 10x test matrix directory
     mtx_dir <- '/lustre/orion/syb111/proj-shared/Personal/jmerlet/projects/atopic_dermatitis/ko/data/count-matrices/SRR14253412_Solo.out/Gene/filtered'
     mtx <- Read10X(mtx_dir)
-    #mtx <- as.spam(as.matrix(mtx))
-    mtx <- as.matrix(mtx)
-    mtx <- t(mtx)
+    if (normalize) { mtx <- NormalizeData(mtx) }
+    mtx <- t(as.spam.dgCMatrix(mtx))
 } else {
     # test a large matrix
     check_rank_zero(print('Loading seurat object...'), start <- Sys.time())
@@ -55,19 +51,7 @@ if (!seurat) {
 }
 
 
-normalize <- function(mtx) {
-    check_rank_zero(print('Normalizing...'), start <- Sys.time())
-    total_umis_per_cell <- rowSums(mtx)
-    mtx <- sweep(mtx, 1, total_umis_per_cell, '/')
-    mtx <- mtx * 1E4
-    mtx <- log(mtx + 1)
-    mtx <- as.spam(mtx)
-    check_rank_zero(print('Normalized'), print(Sys.time() - start))
-    return(mtx)
-}
-
-
-choose_k <- function(mtx, k=100, noise_start=80, thresh=6) {
+choose_k <- function(mtx, k, noise_start=80, max_sds=6) {
     check_rank_zero(print('Choosing k...'), start <- Sys.time())
     noise_svals <- noise_start:k
     rsvd_out <- irlba(mtx, nv=k)
@@ -75,7 +59,7 @@ choose_k <- function(mtx, k=100, noise_start=80, thresh=6) {
     mu <- mean(diffs[noise_svals-1])
     sigma <- sd(diffs[noise_svals-1])
     num_of_sds <- (diffs-mu)/sigma
-    k <- max(which(num_of_sds > thresh))
+    k <- max(which(num_of_sds > max_sds))
     check_rank_zero(print(paste0('k=', k, ' chosen')), print(Sys.time() - start))
     return(k)
 }
