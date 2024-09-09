@@ -24,7 +24,7 @@ def submit_job(tped_path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_
     jobscript = (
         '#!/bin/bash\n'
         '\n'
-        '#SBATCH -A syb111\n'
+        '#SBATCH -A syb114\n'
         '#SBATCH -J comet\n'
         f'#SBATCH -o jobs/{tissue}/logs/{celltype}_comet.%j.out\n'
         f'#SBATCH -e jobs/{tissue}/logs/{celltype}_comet.%j.err\n'
@@ -109,9 +109,8 @@ def comet_already_run(out_dir):
 input_paths = []
 for r, d, f in os.walk(data_dir):
     for tped in f:
-        if 'old' not in r:
-            if '-mtx.bin' in tped:
-                input_paths.append(os.path.join(r, tped))
+        if '-mtx.bin' in tped:
+            input_paths.append(os.path.join(r, tped))
 
 input_paths.sort()
 

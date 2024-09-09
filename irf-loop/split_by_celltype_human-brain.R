@@ -50,23 +50,26 @@ if(all(colnames(obj) == cell_meta$cell_label)) {
 
 for(region in unique(cell_meta$anatomical_division_label)) {
     for(cell_type in unique(cell_meta$description)) {
-	skip <- FALSE
+	#skip <- FALSE
 	print(paste0("working on region: ",region," / cell type: ",cell_type))
 	subset <- cell_meta$anatomical_division_label == region & cell_meta$description == cell_type
         tryCatch({
             matrix_subset <- t(as.data.frame(as.matrix(obj_matrix[,subset])))
-	    region <- gsub(" ","-",tolower(region))
-	    cell_type <- gsub("\\(|\\)","",gsub(" ","-",tolower(cell_type)))
-	    out_path <- paste0(out_irf_dir,region,"_",cell_type,"_irf-loop-mtx.tsv")
+	    region_name <- gsub(" ","-",tolower(region))
+	    cell_type_name <- gsub("\\(|\\)","",gsub(" ","-",tolower(cell_type)))
+	    out_path <- paste0(out_irf_dir,region_name,"_",cell_type_name,"_irf-loop-mtx.tsv")
 	    if(nrow(matrix_subset) >= 60) {
 	        write.table(matrix_subset,file = out_path,col.names = NA,row.names = TRUE,sep = '\t',quote = FALSE)
 	    } else {
 		write.table(matrix_subset,file = out_path,col.names = NA,row.names = TRUE,sep = '\t',quote = FALSE)
-                print(paste0("WARNING not enough data for region: ",region," / cell type: ",cell_type," with ",nrow(obj_matrix)," cells"))
+                print(paste0("WARNING not enough data for region: ",region_name," / cell type: ",cell_type_name," with ",nrow(matrix_subset)," cells"))
 	    }},
-            error = function(e) { skip <<- TRUE }
+            error = function(e) { 
+		#skip <<- TRUE
+	        print(paste0("WARNING matrix too large to save with ",sum(subset)," cells")) 
+	    }
 	)
-	if(skip) { next }
+	#if(skip) { next }
     }
 }
 
