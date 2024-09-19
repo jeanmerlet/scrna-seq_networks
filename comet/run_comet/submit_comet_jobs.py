@@ -1,15 +1,16 @@
-import subprocess
-import os, re
 import pandas as pd
 import numpy as np
+import subprocess
+import argparse
+import os, re
 
 
-data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
-jobs_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/run_comet/jobs'
+#data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
+#jobs_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/run_comet/jobs'
 
 
 # settings
-histogram = False
+histogram = True
 threshold = True
 pct = 0.20
 
@@ -105,29 +106,55 @@ def comet_already_run(out_dir):
     return False
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-j', '--jobs_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
+
+
 # get a list of absolute tped paths
 input_paths = []
-for r, d, f in os.walk(data_dir):
+for r, d, f in os.walk(args.data_dir):
     for tped in f:
         if '-mtx.bin' in tped:
             input_paths.append(os.path.join(r, tped))
 
 input_paths.sort()
 
-# write and submit jobs by celltype
-start_i = 200
-end_i = 300
-for i, path in enumerate(input_paths):
-    if i < start_i: continue
-    if i == end_i: break
-    prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
-    celltype = re.search('tped/(.*)/', path).groups()[0]
-    tissue = re.search('human/(.*)/healthy', path).groups()[0]
-    root_out_dir = os.path.join(prefix, 'comet_out')
-    out_dir = os.path.join(root_out_dir, celltype)
-    os.makedirs(root_out_dir, exist_ok=True)
-    os.makedirs(out_dir, exist_ok=True)
-    num_vectors, num_fields = count_dims(path)
-    if not comet_already_run(out_dir):
-        submit_job(path, jobs_dir, out_dir, celltype, tissue, num_vectors, num_fields, histogram, threshold, ccc=True)
-        print(f'submitted {celltype} in {tissue}', flush=True)
+
+if args.run:
+    # write and submit jobs by celltype
+    start_i = 1
+    end_i = 100
+    for i, path in enumerate(input_paths):
+        if i < start_i: continue
+        if i == end_i: break
+        prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
+        celltype = re.search('tped/(.*)/', path).groups()[0]
+        tissue = re.search('human/(.*)/healthy', path).groups()[0]
+        root_out_dir = os.path.join(prefix, 'comet_out')
+        out_dir = os.path.join(root_out_dir, celltype)
+        os.makedirs(root_out_dir, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
+        num_vectors, num_fields = count_dims(path)
+        if not comet_already_run(out_dir):
+            submit_job(path, args.jobs_dir, out_dir, celltype, tissue,
+                       num_vectors, num_fields, histogram, threshold, ccc=False)
+            print(f'submitted {celltype} in {tissue}')
+
+
+else:
+    print(f'number of binarized mtxs: {len(input_paths)}')
+    count = 0
+    for path in input_paths:
+        prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
+        celltype = re.search('tped/(.*)/', path).groups()[0]
+        tissue = re.search('human/(.*)/healthy', path).groups()[0]
+        root_out_dir = os.path.join(prefix, 'comet_out')
+        out_dir = os.path.join(root_out_dir, celltype)
+        os.makedirs(root_out_dir, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
+        if not comet_already_run(out_dir):
+            count += 1
+    print(f'total binarized mtxs to run comet on: {count}')

@@ -3,10 +3,12 @@
 #SBATCH -J blood_conventional-cd8-t-cells-tem-gzmk+_process
 #SBATCH -o /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/process/human/blood/logs/blood_conventional-cd8-t-cells-tem-gzmk+_process.%j.out
 #SBATCH -e /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/process/human/blood/logs/blood_conventional-cd8-t-cells-tem-gzmk+_process.%j.err
-#SBATCH -t 6:00:00
+#SBATCH -t 12:00:00
 #SBATCH -p batch
-#SBATCH -N 200
+#SBATCH -N 2000
 #SBATCH --threads-per-core=2
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=28
 
 
 unset SLURM_EXPORT_ENV
@@ -22,8 +24,8 @@ export MPICH_OFI_NIC_POLICY="ROUND-ROBIN"
 
 
 # Filepath to the preprocessed data
-INPUT_FILEPATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/blood_conventional-cd8-t-cells-tem-gzmk+/preprocessed.tsv"
-PROJECT_DIRECTORY_PATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/blood_conventional-cd8-t-cells-tem-gzmk+"
+INPUT_FILEPATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/unimputed/blood_conventional-cd8-t-cells-tem-gzmk+/preprocessed.tsv"
+PROJECT_DIRECTORY_PATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/unimputed/blood_conventional-cd8-t-cells-tem-gzmk+"
 OUTPUT_FILE_PATH="${PROJECT_DIRECTORY_PATH}/processed.tsv"
 
 
@@ -35,7 +37,7 @@ cd $PROJECT_DIRECTORY_PATH
 
 
 SECONDS=0
-srun -N 200 --ntasks-per-node=4 --cpus-per-task=14 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 28
+srun -N 2000 --ntasks-per-node=2 --cpus-per-task=28 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 28
 echo $SECONDS elapsed
 
 

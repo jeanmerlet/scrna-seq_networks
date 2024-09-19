@@ -3,10 +3,12 @@
 #SBATCH -J blood_myeloid-cells-non-classical-monocytes_process
 #SBATCH -o /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/process/human/blood/logs/blood_myeloid-cells-non-classical-monocytes_process.%j.out
 #SBATCH -e /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/process/human/blood/logs/blood_myeloid-cells-non-classical-monocytes_process.%j.err
-#SBATCH -t 6:00:00
+#SBATCH -t 12:00:00
 #SBATCH -p batch
-#SBATCH -N 200
+#SBATCH -N 3000
 #SBATCH --threads-per-core=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=56
 
 
 unset SLURM_EXPORT_ENV
@@ -17,13 +19,13 @@ module load boost
 module load ums/default
 module load cray-mpich/8.1.28
 export MPI4PY_RC_RECV_MPROBE=0
-export OMP_NUM_THREADS=28
+export OMP_NUM_THREADS=2
 export MPICH_OFI_NIC_POLICY="ROUND-ROBIN"
 
 
 # Filepath to the preprocessed data
-INPUT_FILEPATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/blood_myeloid-cells-non-classical-monocytes/preprocessed.tsv"
-PROJECT_DIRECTORY_PATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/blood_myeloid-cells-non-classical-monocytes"
+INPUT_FILEPATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/unimputed/blood_myeloid-cells-non-classical-monocytes/preprocessed.tsv"
+PROJECT_DIRECTORY_PATH="/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/networks/unimputed/blood_myeloid-cells-non-classical-monocytes"
 OUTPUT_FILE_PATH="${PROJECT_DIRECTORY_PATH}/processed.tsv"
 
 
@@ -35,7 +37,7 @@ cd $PROJECT_DIRECTORY_PATH
 
 
 SECONDS=0
-srun -N 200 --ntasks-per-node=4 --cpus-per-task=14 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 28
+srun -N 3000 --ntasks-per-node=1 --cpus-per-task=56 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 56
 echo $SECONDS elapsed
 
 

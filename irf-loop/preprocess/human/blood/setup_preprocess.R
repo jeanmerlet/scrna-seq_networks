@@ -6,16 +6,18 @@ if(!dir.exists(log_dir)) {
     dir.create(log_dir)
 }
 tissue_folder <- "/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/"
-tissue_network_folder <- paste0(tissue_folder,"networks/")
+tissue_network_folder <- paste0(tissue_folder,"networks/unimputed/")
 if(!dir.exists(tissue_network_folder)) {
     print("making network folder")
     dir.create(tissue_network_folder)
 }
-irf_matrices <- list.files(paste0(tissue_folder,"irf-loop_mtx/"))
+irf_matrices <- list.files(paste0(tissue_folder,"irf-loop_mtx/unimputed"))
 irf_matrices <- irf_matrices[grepl("_irf-loop-mtx.tsv",irf_matrices)]
 
+irf_matrices <- irf_matrices[c(12,16,20,33,51,57)]
+
 lapply(1:length(irf_matrices),function(cell_type) {
-    irf_matrix_cell_type <- paste0(tissue_folder,"irf-loop_mtx/",irf_matrices[cell_type])
+    irf_matrix_cell_type <- paste0(tissue_folder,"irf-loop_mtx/unimputed/",irf_matrices[cell_type])
     cell_type <- gsub("_irf-loop-mtx.tsv","",irf_matrices[cell_type])
     print(paste0("cell type: ",cell_type))
     cell_type_dir <- paste0(tissue_network_folder,cell_type,"/")
@@ -28,7 +30,7 @@ lapply(1:length(irf_matrices),function(cell_type) {
 	paste0("#SBATCH -J ",cell_type,"_preprocess"),
 	paste0("#SBATCH -o ",log_dir,cell_type,"_preprocess.%j.out"),
 	paste0("#SBATCH -e ",log_dir,cell_type,"_preprocess.%j.err"),
-	"#SBATCH -t 2:00:00",
+	"#SBATCH -t 6:00:00",
 	"#SBATCH -p batch",
 	"#SBATCH -N 1",
 	"#SBATCH --mem=0",

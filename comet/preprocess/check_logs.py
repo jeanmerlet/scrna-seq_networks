@@ -1,7 +1,7 @@
 import os, re
 
 
-log_path = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/create_tped/logs/comet_mtx_to_tped.1588586.out'
+log_path = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/comet/preprocess/logs/comet_mtx_to_tped.2370421.out'
 
 finished = []
 with open(log_path) as logfile:

@@ -1,14 +1,6 @@
-from mpi4py import MPI
 import subprocess
 import argparse
 import os
-
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--data_dir')
-parser.add_argument('-c', '--comet_tools_dir')
-parser.add_argument('-r', '--run', action='store_true')
-args = parser.parse_args()
 
 
 def tped_to_bin(path, validate=False):
@@ -27,28 +19,32 @@ def tped_to_bin(path, validate=False):
 
 
 def tped_to_bin_done(path):
-    if os.path.isfile(path[:-3] + 'bin'):
+    if os.path.isfile(path[:-4] + 'bin'):
         return True
     return False
 
 
-data_dir = '/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human'
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-c', '--comet_tools_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
+
+
 tped_paths = []
-for r, d, f in os.walk(data_dir):
+for r, d, f in os.walk(args.data_dir):
     for tped in f:
         if '.tped' in tped:
-            if 'old' not in r:
-                tped_paths.append(os.path.join(r, tped))
+            tped_paths.append(os.path.join(r, tped))
 
 tped_paths.sort()
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-
 if args.run:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
     paths = []
     for f in tped_paths:
         if not tped_to_bin_done(f):
@@ -56,7 +52,7 @@ if args.run:
     tped_paths = paths
     for i, tped_path in enumerate(tped_paths):
         # distribute filepaths to ranks
-        # this assumes the number of files is gve to the number of ranks
+        # this assumes the number of files is equal to the number of ranks
         if i != rank: continue
         head, filename = os.path.split(tped_path)
         print(f'preprocessing tped {filename} ({rank}/{size})', flush=True)
@@ -67,5 +63,6 @@ else:
     count = 0
     for f in tped_paths:
         if not tped_to_bin_done(f):
+            #print(f)
             count += 1
     print(f'total tpeds to binarize: {count}')

@@ -1,4 +1,4 @@
-from mpi4py import MPI
+#from mpi4py import MPI
 import numpy as np 
 import pandas as pd
 import subprocess
@@ -97,9 +97,9 @@ for r, d, f in os.walk(args.data_dir):
 mtx_paths.sort()
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+#comm = MPI.COMM_WORLD
+#rank = comm.Get_rank()
+#size = comm.Get_size()
 
 
 if args.run:
@@ -108,9 +108,8 @@ if args.run:
         if not check_tped_created(path):
             unprocessed_mtx_paths.append(path)
     for i, path in enumerate(unprocessed_mtx_paths):
-        # distribute filepaths to ranks
-        # this assumes the number of files equals the number of ranks
-        if i != rank: continue
+        # distribute across ranks
+        if i % size != rank: continue
         head, file_name = os.path.split(path)
         print(f'Creating tped from {file_name} ({rank}/{size})...', flush=True)
         make_tped(path)
@@ -121,5 +120,13 @@ else:
     for path in mtx_paths:
         if not check_tped_created(path):
             print(path)
+            file_dir, file_name = os.path.split(path)
+            dir_up, _ = os.path.split(file_dir)
+            tped_dir = os.path.join(dir_up, 'tped')
+            celltype = '_'.join(file_name.split('_')[:-1])
+            celltype_dir = os.path.join(tped_dir, celltype)
+            out_file_name = re.sub(r'tsv$', 'tped', file_name)
+            out_path = os.path.join(celltype_dir, out_file_name)
+            print(out_path)
             count += 1
     print(f'total tpeds to create: {count}')

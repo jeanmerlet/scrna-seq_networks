@@ -5,7 +5,7 @@ if(!dir.exists(log_dir)) {
     dir.create(log_dir)
 }
 tissue_folder <- "/lustre/orion/syb111/proj-shared/Projects/scrna-seq/data/human/blood/healthy/broad_inst/"
-tissue_network_folder <- paste0(tissue_folder,"networks/")
+tissue_network_folder <- paste0(tissue_folder,"networks/unimputed/")
 if(!dir.exists(tissue_network_folder)) {
     dir.create(tissue_network_folder)
 }
@@ -22,14 +22,16 @@ lapply(1:length(irf_matrices),function(cell_type) {
     }
     script <- c(
 	"#!/bin/bash",
-	"#SBATCH -A SYB111",
+	"#SBATCH -A SYB114",
 	paste0("#SBATCH -J ",cell_type,"_process"),
 	paste0("#SBATCH -o ",log_dir,cell_type,"_process.%j.out"),
 	paste0("#SBATCH -e ",log_dir,cell_type,"_process.%j.err"),
-	"#SBATCH -t 6:00:00",
+	"#SBATCH -t 12:00:00",
 	"#SBATCH -p batch",
-	"#SBATCH -N 200",
+	"#SBATCH -N 2000",
 	"#SBATCH --threads-per-core=2",
+	"#SBATCH --ntasks-per-node=2",
+	"#SBATCH --cpus-per-task=28",
 	"\n",
 	"unset SLURM_EXPORT_ENV",
 	"\n",
@@ -52,7 +54,7 @@ lapply(1:length(irf_matrices),function(cell_type) {
 	"cd $PROJECT_DIRECTORY_PATH",
 	"\n",
 	"SECONDS=0",
-	"srun -N 200 --ntasks-per-node=4 --cpus-per-task=14 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 28",
+	"srun -N 2000 --ntasks-per-node=2 --cpus-per-task=28 --threads-per-core=2 python /lustre/orion/syb111/proj-shared/Tools/irf_hp/irf_network_gen/src/process.py --infile $INPUT_FILEPATH --outfile $OUTPUT_FILE_PATH --n_estimators 100 --max_depth 75 --header_row_idx 0 --n_jobs 56",
 	"echo $SECONDS elapsed",
 	"\n"
     )
