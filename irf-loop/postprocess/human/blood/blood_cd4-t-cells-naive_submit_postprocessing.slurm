@@ -3,7 +3,7 @@
 #SBATCH -J blood_cd4-t-cells-naive_postprocess
 #SBATCH -o /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/postprocess/human/blood/logs/blood_cd4-t-cells-naive_postprocess.%j.out
 #SBATCH -e /lustre/orion/syb111/proj-shared/Projects/scrna-seq/code/irf-loop/postprocess/human/blood/logs/blood_cd4-t-cells-naive_postprocess.%j.err
-#SBATCH -t 2:00:00
+#SBATCH -t 4:00:00
 #SBATCH -p batch
 #SBATCH -N 8
 #SBATCH --mem=0
@@ -30,6 +30,12 @@ srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.005 --rep_map
 srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.005 --rep_map_path $REPMAP_FILEPATH --make_undirected --verbose &
 srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.005 --rep_map_path $REPMAP_FILEPATH --weigh_edges_by_acc --verbose &
 srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.005 --rep_map_path $REPMAP_FILEPATH --verbose &
+
+
+srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.01 --rep_map_path $REPMAP_FILEPATH --weigh_edges_by_acc --make_undirected --verbose &
+srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.01 --rep_map_path $REPMAP_FILEPATH --make_undirected --verbose &
+srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.01 --rep_map_path $REPMAP_FILEPATH --weigh_edges_by_acc --verbose &
+srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.01 --rep_map_path $REPMAP_FILEPATH --verbose &
 
 
 srun -N1 -n1 -c21 $iRF_CODE --infile $INPUT_FILEPATH --threshold 0.05 --rep_map_path $REPMAP_FILEPATH --weigh_edges_by_acc --make_undirected --verbose &

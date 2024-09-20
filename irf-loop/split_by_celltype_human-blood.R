@@ -28,6 +28,7 @@ if (pbdMPI::comm.rank() == 0) {
     print("reading in matrices and joining")
 }  
     mtx <- lapply(1:length(cell_types),function(x){
+    #mtx <- lapply(1:2,function(x){
         print(paste0("loading: ",cell_types[x]))
         if(cell_types[x] %in% c("cd4_t_cells","conventional_cd8_t_cells")) {
             meta <- paste0(obj_path,cell_types[x],"/",gsub("_t_cells","",cell_types[x]),"_metadata.csv")
@@ -40,7 +41,10 @@ if (pbdMPI::comm.rank() == 0) {
         meta <- read.csv(meta,row.names = 'X')
         meta$cell_type <- cell_type_names[x]
 	obj <- CreateSeuratObject(counts = obj,meta.data = meta)
-        #obj <- as.spam.dgCMatrix(t(GetAssay(obj,assay = "RNA")@data))
+        obj <- as.spam.dgCMatrix(t(GetAssay(obj,assay = "RNA")@data))
+        # for Seurat v5
+        #obj <- as.spam.dgCMatrix(t(obj[["RNA"]]$counts))
+        #obj <- as.spam.dgCMatrix((obj[["RNA"]]$counts))
         return(list(
 	    obj,
 	    meta

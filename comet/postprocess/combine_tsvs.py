@@ -4,15 +4,12 @@ import subprocess
 import argparse
 import re, os
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--data_dir')
-parser.add_argument('-r', '--run', action='store_true')
-args = parser.parse_args()
+# this script combines the tsvs then max normalizes
 
 
 def get_max(path):
-    weights = pd.read_csv(path, sep='\t', usecols=[2], index_col=None, header=None).values
+    weights = pd.read_csv(path, sep='\t', usecols=[2], index_col=None,
+                          header=None).values
     return np.max(weights)
 
 
@@ -32,6 +29,12 @@ def combine(tsv_dir, out_path):
     subprocess.run(command, shell=True)
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
+
+
 tsv_dirs = []
 for r, d, f in os.walk(args.data_dir):
     for tsv_dir in d:
@@ -45,7 +48,6 @@ if not args.run:
     for d in tsv_dirs:
         print(d)
     print(len(tsv_dirs))
-    raise SystemExit()
 else:
     from mpi4py import MPI
     comm = MPI.COMM_WORLD

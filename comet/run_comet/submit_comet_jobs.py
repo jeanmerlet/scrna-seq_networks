@@ -10,7 +10,7 @@ import os, re
 
 
 # settings
-histogram = True
+histogram = False
 threshold = True
 pct = 0.20
 
@@ -99,6 +99,13 @@ def get_cutoff(hist_path, pct):
     return cutoff
 
 
+def hist_already_run(out_dir):
+    for f in os.listdir(out_dir):
+        if 'hist.tsv' in f:
+            return True
+    return False
+
+
 def comet_already_run(out_dir):
     for f in os.listdir(out_dir):
         if '.bin' in f:
@@ -125,8 +132,8 @@ input_paths.sort()
 
 if args.run:
     # write and submit jobs by celltype
-    start_i = 1
-    end_i = 100
+    start_i = 200
+    end_i = 300
     for i, path in enumerate(input_paths):
         if i < start_i: continue
         if i == end_i: break
@@ -146,7 +153,8 @@ if args.run:
 
 else:
     print(f'number of binarized mtxs: {len(input_paths)}')
-    count = 0
+    hist_count = 0
+    comet_count = 0
     for path in input_paths:
         prefix = re.search('^(.*)/tped/.*$', path).groups()[0]
         celltype = re.search('tped/(.*)/', path).groups()[0]
@@ -155,6 +163,9 @@ else:
         out_dir = os.path.join(root_out_dir, celltype)
         os.makedirs(root_out_dir, exist_ok=True)
         os.makedirs(out_dir, exist_ok=True)
+        if not hist_already_run(out_dir):
+            comet_count += 1
         if not comet_already_run(out_dir):
-            count += 1
-    print(f'total binarized mtxs to run comet on: {count}')
+            comet_count += 1
+    print(f'total binarized mtxs to run hist on: {hist_count}')
+    print(f'total binarized mtxs to run comet on: {comet_count}')

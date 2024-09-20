@@ -3,14 +3,6 @@ import argparse
 import re, os
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--data_dir')
-parser.add_argument('-c', '--comet_tools_dir')
-parser.add_argument('-w', '--num_way')
-parser.add_argument('-r', '--run', action='store_true')
-args = parser.parse_args()
-
-
 def comet_postprocess(in_file, comet_tools_dir, tped_prefix, num_way):
     postprocess = os.path.join(comet_tools_dir, 'postprocess')
     allele_labels = tped_prefix + '_allele_labels.txt'
@@ -32,6 +24,14 @@ def file_is_postprocessed(path):
     return False
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-c', '--comet_tools_dir')
+parser.add_argument('-w', '--num_way')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
+
+
 comet_out_paths = []
 for r, d, f in os.walk(args.data_dir):
     for out_file in f:
@@ -42,22 +42,22 @@ comet_out_paths.sort()
 
 
 if args.run:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
     paths = []
     for path in comet_out_paths:
         if not file_is_postprocessed(path):
             paths.append(path)
     comet_out_paths = paths
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
     for i, path in enumerate(comet_out_paths):
         # distribute across ranks
         if i % size != rank: continue
         head, file_name = os.path.split(path)
         print(f'postprocessing {file_name} ({rank}/{size})', flush=True)
         _, celltype = os.path.split(head)
-        tped_prefix = os.path.join(re.sub('comet_out', 'tped', head), '0.0000000001_var_' + celltype + '_comet-mtx')
+        tped_prefix = os.path.join(re.sub('comet_out', 'tped', head), celltype + '_comet-mtx')
         comet_postprocess(path, args.comet_tools_dir, tped_prefix, args.num_way)
         print(f'finished {file_name} ({rank}/{size})', flush=True)
 else:
@@ -65,8 +65,5 @@ else:
     count = 0
     for path in comet_out_paths:
         if not file_is_postprocessed(path):
-            print(path)
             count += 1
-        #else:
-        #    print(path)
     print(f'total files to postprocess: {count}')
