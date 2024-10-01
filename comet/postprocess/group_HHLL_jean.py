@@ -2,21 +2,6 @@ import argparse
 import os
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--data_dir')
-parser.add_argument('-r', '--run', action='store_true')
-args = parser.parse_args()
-
-
-data_paths = []
-for r, d, f in os.walk(args.data_dir):
-    for txt in f:
-        if 'comet_out' in r and '.txt' in txt:
-            if 'archive' not in r:
-                data_paths.append(os.path.join(r, txt))
-data_paths.sort()
-
-
 def store_edgeweight(name, HH_vals, LL_vals, duo0, duo1, edgeweight):
     if duo0 == '1' and duo1 == '1':
         HH_vals[name] = edgeweight
@@ -46,6 +31,20 @@ def convert_to_edge_list_tsv(in_path):
         for name, edgeweight in HHLL_vals.items():
             out_file.write('\t'.join([name[0], name[1], str(round(edgeweight, 6))]) + '\n')
                     
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--data_dir')
+parser.add_argument('-r', '--run', action='store_true')
+args = parser.parse_args()
+
+
+data_paths = []
+for r, d, f in os.walk(args.data_dir):
+    for txt in f:
+        if 'comet_out' in r and '.txt' in txt:
+            data_paths.append(os.path.join(r, txt))
+data_paths.sort()
+
 
 if not args.run:
     print(f'txt files to convert to combined tsv: {len(data_paths)}')

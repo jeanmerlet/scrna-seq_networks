@@ -25,8 +25,16 @@ def max_norm(in_path, out_path):
 
 
 def combine(tsv_dir, out_path):
-    command = f'cat {tsv_dir}/HHLL_out*.tsv > {out_path}'
+    command = f'cat {tsv_dir}/out*.txt > {out_path}'
     subprocess.run(command, shell=True)
+
+
+def check_combined(tsv_dir):
+    filepaths = [os.path.join(tsv_dir, f) for f in os.listdir(tsv_dir)]
+    for path in filepaths:
+        if re.search('combined.tsv$', path):
+            return True
+    return False
 
 
 parser = argparse.ArgumentParser()
@@ -39,15 +47,17 @@ tsv_dirs = []
 for r, d, f in os.walk(args.data_dir):
     for tsv_dir in d:
         if 'comet_out' in r:
-            if 'archive' not in r:
-                tsv_dirs.append(os.path.join(r, tsv_dir))
+            tsv_dirs.append(os.path.join(r, tsv_dir))
 tsv_dirs.sort()
 
 
 if not args.run:
+    counter = 0
     for d in tsv_dirs:
-        print(d)
-    print(len(tsv_dirs))
+        if check_combined(d):
+            counter += 0
+    print(f'total num tsv dirs: {len(tsv_dirs)}')
+    print(f'num tsvs to combine: {counter}')
 else:
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
